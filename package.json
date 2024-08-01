@@ -1,15 +1,12 @@
 {
   "name": "backend",
   "version": "1.0.0",
+  "description": "Backend server for authentication",
   "main": "app.js",
   "scripts": {
-    "start": "nodemon app.js",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "start": "node app.js",
+    "dev": "nodemon app.js"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "description": "",
   "dependencies": {
     "bcrypt": "^5.1.1",
     "cors": "^2.8.5",
@@ -20,5 +17,7 @@
   },
   "devDependencies": {
     "nodemon": "^3.1.4"
-  }
+  },
+  "author": "",
+  "license": "ISC"
 }
