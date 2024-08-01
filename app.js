@@ -2,8 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const app = express();
 const path = require('path');
-const { open } = require('sqlite');
-const sqlite3 = require('sqlite3');
+const sqlite3 = require('better-sqlite3');
 const bcrypt = require('bcrypt');
 
 app.use(cors());
@@ -11,56 +10,65 @@ app.use(express.json());
 
 let db;
 
-const connectToDB = async () => {
+const connectToDB = () => {
     try {
-        db = await open({
-            filename: path.join(__dirname, 'auth.db'),
-            driver: sqlite3.Database
-        });
+        db = sqlite3(path.join(__dirname, 'auth.db'), { verbose: console.log });
         console.log('Connected to the database successfully');
 
         app.listen(3000, () => {
-            console.log('Server is running at port 3000');
+            console.log('Server is running on port 3000');
         });
     } catch (e) {
-        console.log(`DB error is ${e.message}`);
+        console.error(`DB connection error: ${e.message}`);
         process.exit(1);
     }
 };
 
 connectToDB();
 
-app.post('/register', async (req, res) => {
+app.post('/register', (req, res) => {
     const { name, password, gender, mobileNo } = req.body;
+
+    if (!name || !password || !gender || !mobileNo) {
+        return res.status(400).send({ error: 'All fields are required' });
+    }
+
     try {
-        const hashedPassword = await bcrypt.hash(password, 10);
-        const query = 'INSERT INTO Register (Name, Password, Gender, MobileNo) VALUES (?, ?, ?, ?)';
-        const result = await db.run(query, [name, hashedPassword, gender, mobileNo]);
-        res.status(201).send({ id: result.lastID, message: 'User registered successfully' });
+        const hashedPassword = bcrypt.hashSync(password, 10);
+        const stmt = db.prepare('INSERT INTO Register (Name, Password, Gender, MobileNo) VALUES (?, ?, ?, ?)');
+        const result = stmt.run(name, hashedPassword, gender, mobileNo);
+
+        res.status(201).send({ id: result.lastInsertRowid, message: 'User registered successfully' });
     } catch (e) {
-        console.log(`DB error is ${e.message}`);
+        console.error(`DB error during registration: ${e.message}`);
         res.status(500).send({ error: 'Internal Server Error' });
     }
 });
 
-app.post('/login', async (req, res) => {
+app.post('/login', (req, res) => {
     const { name, password } = req.body;
+
+    if (!name || !password) {
+        return res.status(400).send({ error: 'Name and password are required' });
+    }
+
     try {
-        const getData = await db.get('SELECT * FROM Register WHERE Name = ?', [name]);
+        const stmt = db.prepare('SELECT * FROM Register WHERE Name = ?');
+        const getData = stmt.get(name);
 
         if (!getData) {
-            return res.status(400).send({ error: 'User Not Found' });
+            return res.status(400).send({ error: 'User not found' });
         }
 
-        const checkPassword = await bcrypt.compare(password, getData.Password);
+        const isPasswordCorrect = bcrypt.compareSync(password, getData.Password);
 
-        if (!checkPassword) {
-            return res.status(401).send({ error: 'Invalid Credentials' });
+        if (!isPasswordCorrect) {
+            return res.status(401).send({ error: 'Invalid credentials' });
         }
 
-        res.status(200).json({ message: 'Login Successful' });
+        res.status(200).json({ message: 'Login successful' });
     } catch (e) {
-        console.log(`DB error is ${e.message}`);
+        console.error(`DB error during login: ${e.message}`);
         res.status(500).send({ error: 'Internal Server Error' });
     }
 });
